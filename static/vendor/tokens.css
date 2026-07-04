@@ -1,0 +1,36 @@
+:root {
+  color-scheme: dark;
+  --ui-canvas:#0f1923; --ui-surface-1:#15212c; --ui-surface-2:#1a2733; --ui-surface-3:#22313e;
+  --ui-text:#e6edf3; --ui-text-secondary:#b7c3cf; --ui-text-muted:#a8b8c8; /* raised for >=4.5:1 */
+  --ui-border:#304150; --ui-divider:#263744; --ui-focus:#8dd8fa; --ui-selection:#4fc3f7;
+  --ui-success:#72c77a; --ui-caution:#ffb648; --ui-danger:#f06461; --ui-stale:#d99a35; --ui-unknown:#8896a4;
+  --ui-chart-grid:#314351; --ui-series-1:#4fc3f7; --ui-series-2:#72c77a; --ui-series-3:#ffb648; --ui-series-4:#f06461;
+  --ui-space-1:4px; --ui-space-2:8px; --ui-space-3:12px; --ui-space-4:16px; --ui-space-5:24px;
+  --ui-radius:8px; --ui-radius-sm:5px; --ui-control-height:44px;
+  --ui-font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ui-font-data: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+html.night {
+  color-scheme: dark;
+  --ui-canvas:#080b0d; --ui-surface-1:#0e1316; --ui-surface-2:#131a1e; --ui-surface-3:#1a2328;
+  --ui-text:#e2d7bd; --ui-text-secondary:#b8aa8c; --ui-text-muted:#c8b8a0; /* raised for >=4.5:1 */
+  --ui-border:#403621; --ui-divider:#302817; --ui-focus:#f0ad35; --ui-selection:#d9850b;
+  --ui-success:#a18b42; --ui-caution:#d9850b; --ui-danger:#cf4b3f; --ui-stale:#b66c08; --ui-unknown:#95896f;
+  --ui-chart-grid:#3b321f; --ui-series-1:#d9850b; --ui-series-2:#b79a42; --ui-series-3:#c66d13; --ui-series-4:#cf4b3f;
+  --ui-space-1:4px; --ui-space-2:8px; --ui-space-3:12px; --ui-space-4:16px; --ui-space-5:24px;
+  --ui-radius:8px; --ui-radius-sm:5px; --ui-control-height:44px;
+  --ui-font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ui-font-data: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+html.day {
+  color-scheme: light;
+  --ui-canvas:#eef1f4; --ui-surface-1:#f7f8fa; --ui-surface-2:#ffffff; --ui-surface-3:#e8edf2;
+  --ui-text:#16202a; --ui-text-secondary:#41505e; --ui-text-muted:#4a5a6a; /* darker for contrast on light surfaces */
+  --ui-border:#c7d0d9; --ui-divider:#d8dfe6; --ui-focus:#005fa8; --ui-selection:#006bb8;
+  --ui-success:#187f42; --ui-caution:#b34d00; --ui-danger:#b91f25; --ui-stale:#a85b00; --ui-unknown:#5f6d79;
+  --ui-chart-grid:#d2dae2; --ui-series-1:#0077cc; --ui-series-2:#187f42; --ui-series-3:#b34d00; --ui-series-4:#b91f25;
+  --ui-space-1:4px; --ui-space-2:8px; --ui-space-3:12px; --ui-space-4:16px; --ui-space-5:24px;
+  --ui-radius:8px; --ui-radius-sm:5px; --ui-control-height:44px;
+  --ui-font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ui-font-data: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}

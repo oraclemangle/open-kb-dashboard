@@ -1,0 +1,73 @@
+# open-kb-dashboard configuration — copy to config.yaml and edit.
+# Every value can be overridden with an env var: OPENKB_DASH_<SECTION>_<KEY>
+# (double underscore for nested keys). Env vars win over YAML.
+
+server:
+  host: 127.0.0.1
+  port: 8090
+  # HTTP Basic auth — leave user empty to disable. NEVER commit real values;
+  # prefer the env overrides OPENKB_DASH_SERVER_AUTH__USER / __PASSWORD.
+  auth:
+    user: ""
+    password: ""
+
+kb:
+  # The open-kb REST API this dashboard fronts (see the open-kb project).
+  api_url: http://127.0.0.1:8080
+  token: ""                       # open-kb api.token, if you set one
+  # If the dashboard runs on the SAME host as open-kb's ingest, point this at
+  # open-kb's paths.inbox and uploaded files are queued for ingest automatically.
+  inbox_dir: ""
+
+# The engine picker in the UI. Two providers are built in:
+#   openai — any OpenAI-compatible /v1/chat/completions endpoint
+#            (Ollama, LM Studio, llama.cpp, Groq, ... bring your own)
+#   kb     — answer entirely via open-kb's own /ask endpoint (no extra LLM)
+engines:
+  - id: local
+    label: Local model
+    provider: openai
+    base_url: http://127.0.0.1:11434/v1
+    model: your-instruct-model
+    api_key_env: ""               # name of an env var holding the key, if any
+  - id: kb
+    label: KB direct
+    provider: kb
+
+telemetry:
+  # Splash-screen live pulse + optional prompt injection for live-data
+  # questions. Providers: none | demo | <python module path>.
+  # "demo" generates plausible fake readings so the UI works out of the box.
+  # To wire real NMEA / SignalK / BMS / SCADA data, see
+  # docs/telemetry-adapter-guide.md and adapters/telemetry_base.py.
+  provider: demo
+  # Strip absolute-position fields before any text reaches an LLM or the
+  # browser. A good default for any moving or sensitive asset; set false
+  # only if you know you want positions in prompts.
+  sanitise_position: true
+
+ui:
+  brand: open-kb                  # header + tab title
+  subtitle: knowledge base assistant
+  # Rotating splash tips — put your own operating hints here. The DG1/MSB-1
+  # examples below refer to the SYNTHETIC demo corpus that ships with the
+  # open-kb project (examples/corpus/) so the defaults work out of the box —
+  # replace them with your own equipment once you ingest real documents.
+  tips:
+    - Ask about any equipment by tag, e.g. "DG1 service intervals".
+    - Cite-check answers with the source chips under each reply.
+    - Drag documents onto the chat to teach the knowledge base.
+  # Canned starter questions shown as chips on the splash screen.
+  qa_chips:
+    - What equipment is covered by this knowledge base?
+    - Show the maintenance schedule for DG1.
+    - Which cables feed MSB-1?
+  # Optional per-domain display metadata; unlisted domains get defaults.
+  # domain_meta:
+  #   00_ELECTRICAL: { label: Electrical, icon: bolt }
+
+paths:
+  data_dir: ./data                # sessions/, uploads/, feedback.jsonl
+
+redaction:
+  enabled: true                   # scrub credential-shaped strings from answers

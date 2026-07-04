@@ -1,0 +1,17 @@
+# local config
+config.yaml
+.env
+
+# runtime data (sessions, uploads, feedback)
+data/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# misc
+*.log
+.DS_Store

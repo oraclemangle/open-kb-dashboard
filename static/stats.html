@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Base — Stats</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/vendor/tokens.css">
+<script>
+  try { document.documentElement.className = localStorage.getItem("kb_theme") || ""; } catch (e) {}
+</script>
+<style>
+  :root, html.night, html.day {
+    --bg: var(--ui-canvas);
+    --deck: var(--ui-surface-1);
+    --panel: var(--ui-surface-2);
+    --panel-2: var(--ui-surface-3);
+    --line: var(--ui-border);
+    --line-2: var(--ui-unknown);
+    --ink: var(--ui-text);
+    --muted: var(--ui-text-secondary);
+    --dim: var(--ui-text-muted);
+    --accent: var(--ui-selection);
+    --green: var(--ui-success);
+    --red: var(--ui-danger);
+    --amber: var(--ui-caution);
+    --sans: var(--ui-font-ui);
+    --mono: var(--ui-font-data);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: var(--ink);
+    background:
+      linear-gradient(90deg, rgba(79,195,247,.05) 1px, transparent 1px) 0 0/44px 44px,
+      linear-gradient(rgba(114,199,122,.03) 1px, transparent 1px) 0 0/44px 44px,
+      radial-gradient(circle at 38% -20%, rgba(79,195,247,.09), transparent 34%), var(--bg);
+    font: 15px/1.55 var(--sans); min-height: 100%;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px; padding: 16px 26px;
+    border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header .title { font-size: 17px; font-weight: 600; }
+  header .title .mark { color: var(--accent); }
+  header .sub { color: var(--muted); font-size: 12px; }
+  header .right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  .live { display: inline-flex; align-items: center; gap: 7px; color: var(--green); font-size: 12px; }
+  .live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(114,199,122,.6); animation: pulse 2s infinite; }
+  .live.stale { color: var(--amber); } .live.stale .dot { background: var(--amber); animation: none; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(114,199,122,.5); } 70% { box-shadow: 0 0 0 7px rgba(114,199,122,0); } 100% { box-shadow: 0 0 0 0 rgba(114,199,122,0); } }
+  a.back { color: var(--accent); text-decoration: none; font-size: 13px; }
+  a.back:hover { text-decoration: underline; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; padding: 22px 26px 40px; max-width: 1320px; }
+  .card { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 16px 18px; }
+  .card h2 { margin: 0 0 14px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; }
+  .row .k { color: var(--muted); font-size: 13px; } .row .v { font-size: 14px; }
+  .big { font-size: 30px; font-weight: 600; line-height: 1.1; }
+  .unit { color: var(--dim); font-size: 13px; font-weight: 400; }
+  .split { display: flex; gap: 16px; } .split > div { flex: 1; }
+  .muted { color: var(--muted); }
+  .domain-list { margin-top: 4px; }
+  .domain-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .domain-row:first-child { border-top: none; }
+  .domain-row .n { color: var(--muted); font-size: 12px; }
+  .empty-note { color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="title"><span class="mark">&#9670;</span> Knowledge Base — Stats</div>
+    <div class="sub" id="headerSub">Assistant overview</div>
+  </div>
+  <div class="right">
+    <span class="live" id="live"><span class="dot"></span><span id="liveTxt">connecting…</span></span>
+    <a class="back" href="/">&larr; Assistant</a>
+  </div>
+</header>
+
+<div class="grid">
+  <div class="card">
+    <h2>Knowledge base</h2>
+    <div class="split">
+      <div><div class="big" id="kbDocs">–</div><div class="muted" style="font-size:12px">documents</div></div>
+      <div><div class="big" id="kbChunks">–</div><div class="muted" style="font-size:12px">chunks</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Domains</h2>
+    <div class="domain-list" id="domainList"><div class="empty-note">No domain data yet</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Assistant activity (today)</h2>
+    <div class="row"><span class="k">Questions answered</span><span class="big" id="qToday">–</span></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+
+async function loadBrand() {
+  try {
+    const r = await fetch("/config/ui");
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d && d.brand) {
+      document.title = d.brand + " — Stats";
+      const sub = $("#headerSub");
+      if (sub) sub.textContent = d.brand + (d.subtitle ? " · " + d.subtitle : "");
+    }
+  } catch (_) {}
+}
+
+async function tick() {
+  let d;
+  try {
+    const r = await fetch("/splash", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    d = await r.json();
+  } catch (e) {
+    const live = $("#live"); live.classList.add("stale"); $("#liveTxt").textContent = "offline";
+    return;
+  }
+  const live = $("#live");
+  live.classList.remove("stale");
+  $("#liveTxt").textContent = "live";
+
+  const kb = d.kb || {};
+  $("#kbDocs").textContent = kb.documents != null ? kb.documents.toLocaleString() : "–";
+  $("#kbChunks").textContent = kb.chunks != null ? kb.chunks.toLocaleString() : "–";
+
+  const domains = Array.isArray(kb.domains) ? kb.domains : [];
+  const domainList = $("#domainList");
+  domainList.innerHTML = domains.length ? domains.map(dm =>
+    '<div class="domain-row"><span>' + esc(dm.name || "Unnamed") + '</span>'
+    + '<span class="n">' + (dm.documents != null ? dm.documents.toLocaleString() : "–") + ' documents</span></div>'
+  ).join("") : '<div class="empty-note">No domain data yet</div>';
+
+  $("#qToday").textContent = typeof d.queries_today === "number" ? d.queries_today.toLocaleString() : "–";
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[<>&"']/g, c => (
+    {"<":"&lt;", ">":"&gt;", "&":"&amp;", "\"":"&quot;", "'":"&#39;"}[c]
+  ));
+}
+
+loadBrand();
+tick();
+setInterval(tick, 5000);
+</script>
+</body>
+</html>
