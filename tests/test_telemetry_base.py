@@ -46,6 +46,24 @@ def test_strip_positions_obj_handles_nested_structured_payloads():
     assert out["extra"]["rpm"] == 1200
 
 
+def test_strip_positions_obj_redacts_compound_and_camelcase_keys():
+    # F-08 residual: a custom provider using compound key names must not leak coordinates.
+    payload = {
+        "gpsLat": 10.5, "gpsLon": -140.25, "vesselPosition": "10.5,-140.25",
+        "nav_coords": [10.5, -140.25], "sensor.lat": 10.5,
+    }
+    out = strip_positions_obj(payload)
+    dumped = json.dumps(out)
+    assert "10.5" not in dumped and "140.25" not in dumped
+
+
+def test_strip_positions_obj_keeps_lookalike_keys():
+    # Token matching, not substring: latency/fixture/longshore are NOT position keys.
+    payload = {"latency": 42, "fixture": "F-101", "longshore": "crew"}
+    out = strip_positions_obj(payload)
+    assert out == payload
+
+
 def test_load_provider_none():
     assert load_provider({"telemetry": {"provider": "none"}}) is None
     assert load_provider({"telemetry": {"provider": ""}}) is None

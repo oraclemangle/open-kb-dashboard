@@ -702,7 +702,10 @@ def make_handler(app: DashboardApp):
 
             if u.path == "/health":
                 kb_health = app.kb.health()
-                return self._send(200, {"ok": True, "kb": kb_health})
+                # ok reflects reality: False when the KB is unreachable (None) or reports an error,
+                # so a monitoring client checking only the top-level flag sees the true state.
+                kb_ok = kb_health is not None and not (isinstance(kb_health, dict) and kb_health.get("error"))
+                return self._send(200, {"ok": bool(kb_ok), "kb": kb_health})
 
             if u.path == "/splash":
                 return self._send(200, app.splash_data())

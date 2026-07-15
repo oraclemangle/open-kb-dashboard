@@ -65,12 +65,25 @@ def strip_positions_obj(value):
     if isinstance(value, dict):
         out = {}
         for key, item in value.items():
-            if re.search(r"^(lat|latitude|lon|lng|longitude|position|gps|fix|coord|coords)$", str(key), re.I):
+            if _is_position_key(str(key)):
                 out[key] = "[position redacted]"
             else:
                 out[key] = strip_positions_obj(item)
         return out
     return value
+
+
+_POSITION_TOKENS = frozenset(
+    {"lat", "latitude", "lon", "lng", "longitude", "position", "gps", "fix", "coord", "coords"})
+
+
+def _is_position_key(key):
+    """True when any word-token of the key is position-bearing. Tokenises camelCase, snake_case,
+    kebab-case and dotted keys so compound names like gpsLat, vessel_position or nav.coords match,
+    while whole words like 'latency' or 'fixture' do not (token match, not substring)."""
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", key)          # camelCase -> camel Case
+    tokens = re.split(r"[^A-Za-z]+", spaced)
+    return any(tok.lower() in _POSITION_TOKENS for tok in tokens if tok)
 
 
 class TelemetryProvider(Protocol):
