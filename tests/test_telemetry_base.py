@@ -2,9 +2,11 @@
 load_provider()."""
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from adapters.telemetry_base import load_provider, strip_positions
+from adapters.telemetry_base import load_provider, strip_positions, strip_positions_obj
 from adapters.telemetry_demo import Provider as DemoProvider
 
 
@@ -35,6 +37,13 @@ def test_strip_positions_leaves_plain_numbers_alone():
     text = "speed 12.3 units, load 45 pct, tank level 88.4"
     out = strip_positions(text)
     assert out == text
+
+
+def test_strip_positions_obj_handles_nested_structured_payloads():
+    payload = {"state": "underway", "extra": {"gps": {"lat": 10.5, "lon": -140.25}, "rpm": 1200}}
+    out = strip_positions_obj(payload)
+    assert "10.5" not in json.dumps(out)
+    assert out["extra"]["rpm"] == 1200
 
 
 def test_load_provider_none():

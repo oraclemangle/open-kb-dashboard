@@ -54,14 +54,15 @@ class KBClient:
     @staticmethod
     def _err(e: Exception) -> dict:
         if isinstance(e, urllib.error.HTTPError):
+            state = "auth_mismatch" if e.code in (401, 403) else "kb_error"
             try:
                 detail = json.loads(e.read())
                 if isinstance(detail, dict) and detail.get("error"):
-                    return {"error": str(detail["error"])}
+                    return {"error": str(detail["error"]), "state": state, "status": e.code}
             except Exception:
                 pass
-            return {"error": "kb returned HTTP %d" % e.code}
-        return {"error": "kb unreachable (%s)" % type(e).__name__}
+            return {"error": "kb returned HTTP %d" % e.code, "state": state, "status": e.code}
+        return {"error": "kb unreachable (%s)" % type(e).__name__, "state": "kb_offline"}
 
     # -- endpoints ----------------------------------------------------------
     def health(self) -> dict | None:
@@ -103,6 +104,19 @@ class KBClient:
             return hits if isinstance(hits, list) else []
         except Exception:
             return []
+
+    def search_status(self, query: str, k: int = 8, domains: list[str] | None = None) -> dict:
+        """POST /search with explicit transport/auth/no-result state."""
+        try:
+            payload: dict = {"query": query, "k": k}
+            if domains:
+                payload["domains"] = domains
+            data = self._post("/search", payload)
+            hits = data.get("hits") if isinstance(data, dict) else data
+            hits = hits if isinstance(hits, list) else []
+            return {"hits": hits, "state": "ok" if hits else "no_results"}
+        except Exception as e:
+            return {"hits": [], **self._err(e)}
 
     def ask(self, query: str, k: int = 8, domains: list[str] | None = None) -> dict:
         """POST /ask -> {"answer","sources"}; {"error":...} on failure."""

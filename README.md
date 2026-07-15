@@ -47,11 +47,13 @@ three themes.
 |---|---|
 | **Design system** | Three themes (default / night / day) driven by CSS custom properties, no build step |
 | **Splash screen** | Greeting, telemetry pulse (optional), queries-today counter, rotating operating tips, domain cards pulled from the KB, starter question chips |
-| **Chat** | Server-sent events (SSE) streaming, full markdown rendering, inline ` ```chart ` blocks rendered as SVG charts |
+| **Chat** | Server-sent event delivery with credential-safe buffered answers, full markdown rendering, inline ` ```chart ` blocks rendered as SVG charts |
 | **Citations** | Citation chips under every answer; click through to a source viewer modal with the original document text |
 | **Sessions** | A sessions rail for past conversations, backed by flat files under `paths.data_dir` |
 | **Engine picker** | Switch between any configured backend: `openai` (Ollama, LM Studio, llama.cpp, Groq, or anything speaking `/v1/chat/completions`) or `kb` (answer straight from open-kb's own `/ask`, zero extra LLM calls) |
-| **Feedback** | Thumbs up/down on each answer, logged to `paths.data_dir` |
+| **Feedback** | Thumbs up/down with stable turn ID, engine/state and source provenance, logged to `paths.data_dir` |
+| **Operational states** | Grounded, partial, KB offline/auth mismatch, model offline, no relevant results and generation failure are shown distinctly |
+| **Stats** | `/stats` operator page backed by the uncached `/api/stats` endpoint |
 | **Upload** | Drag-and-drop file upload; optionally lands directly in open-kb's ingest inbox (see below) |
 | **Credential redaction** | Outbound text is scrubbed of credential-shaped strings before it reaches a browser or LLM (see `redaction.py`) |
 | **Live telemetry** | Optional live-data pulse and prompt injection via a pluggable `TelemetryProvider` — see the dedicated section below |
@@ -157,6 +159,9 @@ sensitive.
   AWS-style access keys) from any text before it's passed on. This is a
   creds-only scrubber, not a general PII/topology redactor — layer your own
   rules on top if you need stricter behaviour.
+- **Buffered model output.** Upstream deltas are joined and scrubbed before
+  any answer text reaches the browser. This prevents a credential split across
+  token boundaries from bypassing the scrubber.
 
 ## Documentation map
 

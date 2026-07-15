@@ -21,6 +21,7 @@ from typing import Iterator
 class KBAgentEngine:
     def __init__(self, kb_client):
         self.kb = kb_client
+        self.last_result = None
 
     def stream(self, system: str, messages: list[dict]) -> Iterator[str]:
         question = ""
@@ -32,6 +33,7 @@ class KBAgentEngine:
             yield "[engine error: no question to ask the knowledge base]"
             return
         result = self.kb.ask(question)
+        self.last_result = result
         if not isinstance(result, dict) or result.get("error"):
             err = result.get("error") if isinstance(result, dict) else "unexpected response"
             yield "[engine error: knowledge base could not answer (%s)]" % err

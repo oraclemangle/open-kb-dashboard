@@ -1356,9 +1356,15 @@ function feedbackHtml(mid) {
     + '</div>';
 }
 
-function engineBadge(engineId) {
-  if (!engineId) return "";
-  return '<div class="answer-meta"><span class="badge engine">' + esc(engineLabel(engineId)) + '</span></div>';
+function engineBadge(engineId, state) {
+  const labels = {grounded:"Grounded", partial:"Partial", kb_offline:"KB offline",
+    auth_mismatch:"KB authentication mismatch", model_offline:"Model offline",
+    no_results:"No relevant results", generation_failure:"Generation failed",
+    retrieval_error:"Retrieval failed", kb_error:"KB error", unknown:"Unknown state"};
+  if (!engineId && !state) return "";
+  return '<div class="answer-meta">'
+    + (engineId ? '<span class="badge engine">' + esc(engineLabel(engineId)) + '</span>' : '')
+    + (state ? '<span class="badge">' + esc(labels[state] || state) + '</span>' : '') + '</div>';
 }
 
 function finalize(shell, d, streamed) {
@@ -1373,11 +1379,14 @@ function finalize(shell, d, streamed) {
   const reply = data.reply || streamed || "";
   shell.bubble.innerHTML = reply ? md(reply) : '<span style="color:var(--amber)">No reply generated.</span>';
   const mid = shell.root.dataset.mid;
+  shell.root.dataset.turnId = data.turn_id || "";
+  shell.root.dataset.engine = data.engine || selectedEngine || "";
+  shell.root.dataset.state = data.state || "unknown";
   const fb = reply ? feedbackHtml(mid) : "";
   if (reply) feedbackStore[mid] = {};
   const sources = data.sources && data.sources.length ? data.sources : shell.sources;
   shell.after.innerHTML = messageActions(reply)
-    + sourcesHtml(sources, mid) + engineBadge(data.engine || selectedEngine) + fb;
+    + sourcesHtml(sources, mid) + engineBadge(data.engine || selectedEngine, data.state || "unknown") + fb;
   activityLine.textContent = "Standing by";
   scrollDown();
 }
@@ -1503,11 +1512,20 @@ async function submitFeedback(box) {
   const note = (noteEl && noteEl.value) || "";
   box.classList.add("fb-sent");
   const sendBtnEl = box.querySelector(".fb-send");
+  const msg = box.closest(".msg");
   if (sendBtnEl) sendBtnEl.disabled = true;
   try {
     const resp = await fetch("/feedback", {
       method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({session_id: sessionId, verdict: verdict, note: note})
+      body: JSON.stringify({
+        session_id: sessionId,
+        turn_id: msg ? msg.dataset.turnId : "",
+        engine: msg ? msg.dataset.engine : "",
+        state: msg ? msg.dataset.state : "",
+        source_ids: Array.from(msg ? msg.querySelectorAll(".source-card") : [])
+          .map(card => card.dataset.docId).filter(Boolean),
+        verdict: verdict, note: note
+      })
     });
     if (resp.status === 401) authHint.hidden = false;
     if (!resp.ok) throw new Error("status " + resp.status);
@@ -1558,12 +1576,14 @@ async function reloadHistory() {
     if (!hist.length) return;
     transcript.innerHTML = "";
     for (const c of hist) {
-      const text = (c && typeof c.content === "string") ? c.content.trim() : "";
+      const rawText = c && (typeof c.text === "string" ? c.text : (typeof c.content === "string" ? c.content : ""));
+      const text = rawText.trim();
       if (!text) continue;
       if (c.role === "user") addUserMsg(text);
       else if (c.role === "assistant") {
         const shell = makeAssistantShell();
-        finalize(shell, {reply: text, sources: c.sources || []}, text);
+        finalize(shell, {reply: text, sources: c.sources || [], turn_id: c.turn_id || "",
+          engine: c.engine || "", state: c.state || "unknown"}, text);
       }
     }
     scrollDown();

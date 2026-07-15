@@ -54,6 +54,25 @@ def strip_positions(text: str) -> str:
     return _COORD.sub("[position redacted]", text)
 
 
+def strip_positions_obj(value):
+    """Recursively sanitise position-bearing keys and coordinate strings."""
+    if isinstance(value, str):
+        return strip_positions(value)
+    if isinstance(value, list):
+        return [strip_positions_obj(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(strip_positions_obj(item) for item in value)
+    if isinstance(value, dict):
+        out = {}
+        for key, item in value.items():
+            if re.search(r"^(lat|latitude|lon|lng|longitude|position|gps|fix|coord|coords)$", str(key), re.I):
+                out[key] = "[position redacted]"
+            else:
+                out[key] = strip_positions_obj(item)
+        return out
+    return value
+
+
 class TelemetryProvider(Protocol):
     def snapshot(self) -> dict | None: ...
     def fetch(self, question: str) -> tuple[str, dict] | None: ...
