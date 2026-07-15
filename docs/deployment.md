@@ -91,9 +91,16 @@ Type=simple
 User=<SERVICE_USER>
 WorkingDirectory=<PATH_TO_OPEN_KB_DASHBOARD>
 Environment=OPENKB_DASH_CONFIG=<PATH_TO_OPEN_KB_DASHBOARD>/config.yaml
-ExecStart=/usr/bin/python3 <PATH_TO_OPEN_KB_DASHBOARD>/server.py
+ExecStart=<PATH_TO_OPEN_KB_DASHBOARD>/.venv/bin/python <PATH_TO_OPEN_KB_DASHBOARD>/server.py
 Restart=on-failure
 RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=<PATH_TO_DASHBOARD_DATA>
+MemoryMax=1G
+CPUQuota=100%
 
 [Install]
 WantedBy=multi-user.target
