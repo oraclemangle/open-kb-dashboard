@@ -58,6 +58,8 @@ via YAML — env overrides only reach scalar leaves under a section.
 | `api_url` | `http://127.0.0.1:8080` | `OPENKB_DASH_KB_API_URL` | Base URL of the open-kb REST API this dashboard fronts |
 | `token` | `""` | `OPENKB_DASH_KB_TOKEN` | Must match open-kb's own `api.token` if it has one set. Sent as `Authorization: Bearer <token>` on `POST` routes only |
 | `inbox_dir` | *(unset)* | `OPENKB_DASH_KB_INBOX_DIR` | Optional. Set to open-kb's `paths.inbox` **on the same host** to make drag-drop upload land directly in the ingest inbox. See `docs/deployment.md` |
+| `upload_max_bytes` | `104857600` | `OPENKB_DASH_KB_UPLOAD_MAX_BYTES` | Hard per-file limit (100 MiB by default); checked before the request body is read |
+| `upload_min_free_bytes` | `536870912` | `OPENKB_DASH_KB_UPLOAD_MIN_FREE_BYTES` | Refuse completion when it would leave less free space than this reserve (512 MiB by default) |
 
 ## `engines`
 

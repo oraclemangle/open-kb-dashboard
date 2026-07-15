@@ -66,6 +66,13 @@ Requirements:
   auto-ingested until you move them across yourself.
 - Nothing here bypasses open-kb's own secret-detection gate — files still
   go through `openkb ingest`'s normal quarantine check once picked up.
+- The server accepts only open-kb's supported document extensions and checks
+  lightweight PDF/OOXML/image signatures (or UTF-8 for text formats).
+- Dashboard storage and inbox promotion use complete same-directory temporary
+  files, file/directory `fsync`, and atomic no-overwrite publication. Concurrent
+  same-name uploads receive distinct names; ingest never sees a partial copy.
+- A symlinked inbox root is rejected, and the configured disk reserve prevents
+  a large upload from consuming the last usable filesystem space.
 
 ## Running as a service
 

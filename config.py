@@ -22,7 +22,13 @@ DEFAULTS: dict[str, Any] = {
         "port": 8090,
         "auth": {"user": "", "password": ""},
     },
-    "kb": {"api_url": "http://127.0.0.1:8080", "token": "", "inbox_dir": ""},
+    "kb": {
+        "api_url": "http://127.0.0.1:8080",
+        "token": "",
+        "inbox_dir": "",
+        "upload_max_bytes": 100 * 1024 * 1024,
+        "upload_min_free_bytes": 512 * 1024 * 1024,
+    },
     "engines": [
         {"id": "local", "label": "Local model", "provider": "openai",
          "base_url": "http://127.0.0.1:11434/v1", "model": "your-instruct-model",

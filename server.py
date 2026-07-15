@@ -17,7 +17,9 @@ import hmac
 import json
 import os
 import re
+import shutil
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -37,6 +39,12 @@ STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_MESSAGE_LEN = 4000
 MAX_BODY_BYTES = 64 * 1024
 UPLOAD_MAX_BYTES = 100 * 1024 * 1024
+SUPPORTED_UPLOAD_EXTENSIONS = {
+    ".pdf", ".docx", ".pptx", ".xlsx", ".xlsm", ".txt", ".md", ".csv",
+    ".png", ".jpg", ".jpeg",
+}
+_ZIP_EXTENSIONS = {".docx", ".pptx", ".xlsx", ".xlsm"}
+_TEXT_EXTENSIONS = {".txt", ".md", ".csv"}
 
 SYSTEM_PROMPT = (
     "You are an engineering knowledge-base assistant for a complex physical asset "
@@ -46,6 +54,97 @@ SYSTEM_PROMPT = (
     "contain the answer, say so plainly rather than guessing. Be precise with "
     "identifiers, part numbers, and specifications. Use clear, concise markdown."
 )
+
+
+def validate_upload(filename: str, data: bytes) -> str:
+    """Validate the supported-document policy before anything is stored."""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in SUPPORTED_UPLOAD_EXTENSIONS:
+        raise ValueError("unsupported document type")
+    if ext == ".pdf" and not data.startswith(b"%PDF-"):
+        raise ValueError("PDF signature mismatch")
+    if ext in _ZIP_EXTENSIONS and not data.startswith(b"PK\x03\x04"):
+        raise ValueError("OOXML signature mismatch")
+    if ext == ".png" and not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("PNG signature mismatch")
+    if ext in {".jpg", ".jpeg"} and not data.startswith(b"\xff\xd8\xff"):
+        raise ValueError("JPEG signature mismatch")
+    if ext in _TEXT_EXTENSIONS:
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError("text upload must be UTF-8") from exc
+    return ext
+
+
+def _fsync_dir(path: str) -> None:
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _safe_upload_name(filename: str) -> str:
+    return re.sub(r"[^A-Za-z0-9 ._()-]", "_", os.path.basename(filename))[:180].strip(". ") or "upload"
+
+
+def _publish_temp_unique(tmp: str, directory: str, filename: str) -> str:
+    """Atomically hard-link a complete temp file to a never-overwritten name."""
+    stem, ext = os.path.splitext(filename)
+    index = 0
+    while True:
+        name = filename if index == 0 else "%s__%d%s" % (stem, index, ext)
+        candidate = os.path.join(directory, name)
+        try:
+            os.link(tmp, candidate, follow_symlinks=False)
+            os.remove(tmp)
+            _fsync_dir(directory)
+            return name
+        except FileExistsError:
+            index += 1
+
+
+def _publish_unique_bytes(directory: str, filename: str, data: bytes) -> str:
+    if os.path.islink(directory):
+        raise OSError("destination directory is a symlink")
+    os.makedirs(directory, exist_ok=True)
+    if os.path.islink(directory) or not os.path.isdir(directory):
+        raise OSError("destination directory is not a regular directory")
+    fd, tmp = tempfile.mkstemp(prefix=".upload-", dir=directory)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        return _publish_temp_unique(tmp, directory, filename)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _promote_unique_copy(src: str, inbox_dir: str, filename: str) -> str:
+    if os.path.islink(inbox_dir):
+        raise OSError("inbox directory is a symlink")
+    os.makedirs(inbox_dir, exist_ok=True)
+    if os.path.islink(inbox_dir) or not os.path.isdir(inbox_dir):
+        raise OSError("inbox destination is not a regular directory")
+    fd, tmp = tempfile.mkstemp(prefix=".inbox-", dir=inbox_dir)
+    try:
+        with os.fdopen(fd, "wb") as out_fh, open(src, "rb") as in_fh:
+            shutil.copyfileobj(in_fh, out_fh, length=1 << 20)
+            out_fh.flush()
+            os.fsync(out_fh.fileno())
+        return _publish_temp_unique(tmp, inbox_dir, filename)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 # ----------------------------------------------------------------------------
@@ -375,32 +474,27 @@ class DashboardApp:
 
     # -- upload -------------------------------------------------------------
     def store_upload(self, filename: str, data: bytes) -> dict:
+        validate_upload(filename, data)
         uploads_dir = os.path.join(self.data_dir, "uploads")
         os.makedirs(uploads_dir, exist_ok=True)
-        safe = re.sub(r"[^A-Za-z0-9 ._()-]", "_", os.path.basename(filename))[:180].strip(". ") or "upload"
-        dest = os.path.join(uploads_dir, safe)
-        stem, ext = os.path.splitext(safe)
-        i = 1
-        while os.path.exists(dest):
-            dest = os.path.join(uploads_dir, "%s__%d%s" % (stem, i, ext))
-            i += 1
-        tmp = dest + ".part"
-        with open(tmp, "wb") as fh:
-            fh.write(data)
-        os.replace(tmp, dest)
+        reserve = int(self.cfg.get("kb", {}).get("upload_min_free_bytes", 512 * 1024 * 1024))
+        if shutil.disk_usage(uploads_dir).free - len(data) < reserve:
+            raise OSError("upload would breach free space reserve")
+        safe = _safe_upload_name(filename)
+        stored_name = _publish_unique_bytes(uploads_dir, safe, data)
+        dest = os.path.join(uploads_dir, stored_name)
 
         ingest_queued = False
+        queued_as = None
         inbox_dir = self.cfg.get("kb", {}).get("inbox_dir")
         if inbox_dir:
             try:
-                os.makedirs(inbox_dir, exist_ok=True)
-                import shutil
-                shutil.copy2(dest, os.path.join(inbox_dir, os.path.basename(dest)))
+                queued_as = _promote_unique_copy(dest, inbox_dir, stored_name)
                 ingest_queued = True
             except Exception as e:
                 print("[open-kb-dashboard] inbox copy failed: %s" % e, file=sys.stderr)
 
-        return {"ok": True, "stored": os.path.basename(dest), "ingest_queued": ingest_queued}
+        return {"ok": True, "stored": stored_name, "ingest_queued": ingest_queued, "queued_as": queued_as}
 
 
 # ----------------------------------------------------------------------------
@@ -564,19 +658,27 @@ def make_handler(app: DashboardApp):
             name = os.path.basename(unquote(self.headers.get("X-Filename", "")).replace("\\", "/")).strip()
             if not name:
                 return self._send(400, {"error": "missing X-Filename header"})
+            if os.path.splitext(name)[1].lower() not in SUPPORTED_UPLOAD_EXTENSIONS:
+                return self._send(415, {"error": "unsupported document type"})
             try:
                 n = int(self.headers.get("Content-Length", "0"))
             except ValueError:
                 n = 0
             if n <= 0:
                 return self._send(400, {"error": "empty file"})
-            if n > UPLOAD_MAX_BYTES:
-                return self._send(413, {"error": "file too large", "max_mb": UPLOAD_MAX_BYTES // (1024 * 1024)})
+            upload_max = int(app.cfg.get("kb", {}).get("upload_max_bytes", UPLOAD_MAX_BYTES))
+            if n > upload_max:
+                return self._send(413, {"error": "file too large", "max_mb": upload_max // (1024 * 1024)})
             data = self.rfile.read(n)
             if len(data) != n:
                 return self._send(400, {"error": "upload incomplete"})
             try:
                 return self._send(200, app.store_upload(name, data))
+            except ValueError as e:
+                return self._send(415, {"error": str(e)})
+            except OSError as e:
+                print("[open-kb-dashboard] upload storage guard: %r" % e, file=sys.stderr)
+                return self._send(507, {"error": "insufficient or unsafe storage"})
             except Exception as e:
                 print("[open-kb-dashboard] upload failed: %r" % e, file=sys.stderr)
                 return self._send(500, {"error": "could not store upload"})
